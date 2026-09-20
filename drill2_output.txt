@@ -1,0 +1,134 @@
+ASSUMPTIONS
+1. Timestamps are parsed as explicit IST offsets.
+2. A trip ping uses same vehicle plus recorded_at inside exact scheduled start/end.
+3. Near stop/origin/destination means <=100m; moving means speed >1 km/h.
+4. GPS progress is a projection onto the ordered stop polyline using a local planar approximation.
+5. Scheduled-time fraction assumes uniform progress from 0% at start to 100% at end, including no explicit dwell allocation.
+6. Fixed-clock comparisons use 07:45 IST and last ping received by that time unless noted.
+7. Stop arrival is first ping within 100m of that stop, not proof of a physical stop.
+8. No row is excluded, corrected, or used to calculate lateness.
+
+1. POLYLINE FRACTION VS SCHEDULED-TIME FRACTION
+Polyline fraction is GPS location projected onto stop geometry / polyline length. Scheduled-time fraction is (time - scheduled_start) / (scheduled_end - scheduled_start). The latter is a straight-line-in-time assumption: at 50% of scheduled time, the bus is assumed 50% along the polyline. It has no dwell-time information.
+
+15/16 June: fixed-clock 07:45 comparison
+ trip_id       date  route_id  scheduled_time_pct last_ping  polyline_pct  polyline_minus_time_pp
+TRIP_001 2026-06-15         9                92.7 P-0000152          89.3                    -3.4
+TRIP_002 2026-06-15        11                92.9 P-0000434          94.1                     1.3
+TRIP_003 2026-06-15        12                61.7 P-0000636          58.8                    -2.8
+TRIP_004 2026-06-15        14                93.3 P-0000994          94.6                     1.3
+TRIP_005 2026-06-15        17                76.9 P-0001236          78.5                     1.6
+TRIP_006 2026-06-15        21                60.0 P-0001429          56.2                    -3.8
+TRIP_007 2026-06-16         9               109.1 P-0001718          97.8                   -11.3
+TRIP_008 2026-06-16        11                91.4 P-0001983          91.0                    -0.4
+TRIP_009 2026-06-16        12                71.7 P-0002204          69.1                    -2.6
+TRIP_010 2026-06-16        14                80.0 P-0002511          80.3                     0.3
+TRIP_011 2026-06-16        17                92.3 P-0002814          90.6                    -1.7
+TRIP_012 2026-06-16        21                60.0 P-0002976          61.7                     1.7
+
+Absolute gap summary
+ absolute_percentage_points
+                  12.000000
+                   2.683333
+                   2.921031
+                   0.300000
+                   1.300000
+                   1.700000
+                   2.950000
+                  11.300000
+
+2. ROUTE 12 / V-10
+
+All V-10 pings before 07:15 on 17 June
+  None
+
+17 June pre-scheduled-start pings by vehicle
+ trip_id vehicle  route  prestart_ping_count first_prestart_id first_prestart_recorded
+TRIP_013    V-11      9                    0              None                     NaT
+TRIP_014    V-06     11                    0              None                     NaT
+TRIP_015    V-10     12                    0              None                     NaT
+TRIP_016    V-04     14                    0              None                     NaT
+TRIP_017    V-05     17                    0              None                     NaT
+TRIP_018    V-03     21                    0              None                     NaT
+TRIP_019    V-09     21                    0              None                     NaT
+
+Route 12 first observed near-stop time by date
+ seq stop_id         stop_name                2026-06-15                2026-06-16                2026-06-17
+   1  S-1201 Mulund Check Naka 2026-06-15 07:08:00+05:30 2026-06-16 07:02:00+05:30 2026-06-17 07:15:00+05:30
+   2  S-1202             Nahur 2026-06-15 07:15:01+05:30 2026-06-16 07:09:05+05:30 2026-06-17 07:21:59+05:30
+   3  S-1203           Bhandup 2026-06-15 07:26:11+05:30 2026-06-16 07:19:43+05:30 2026-06-17 07:32:16+05:30
+   4  S-1204          Vikhroli 2026-06-15 07:33:49+05:30 2026-06-16 07:27:10+05:30 2026-06-17 07:39:29+05:30
+   5  S-1205        Kanjurmarg 2026-06-15 07:44:02+05:30 2026-06-16 07:37:45+05:30 2026-06-17 07:49:56+05:30
+   6  S-1206          Powai Jn 2026-06-15 07:50:40+05:30 2026-06-16 07:44:00+05:30 2026-06-17 07:55:51+05:30
+   7  S-1207             Marol 2026-06-15 08:01:26+05:30 2026-06-16 07:54:54+05:30                       NaT
+   8  S-1208           Chakala                       NaT                       NaT                       NaT
+No pre-07:15 V-10 ping cannot by itself distinguish a later vehicle departure from a device/reporting start at 07:15; the CSV contains no independent engine/dispatch event.
+
+3. V-05 / TRIP_017
+
+Last 10 V-05 pings before 07:27:42
+  ping_id               recorded_at               received_at  speed_kmph  along_pct near_stop
+P-0004078 2026-06-17 07:24:41+05:30 2026-06-17 07:24:43+05:30        22.9  66.662918  Dadar TT
+P-0004079 2026-06-17 07:25:04+05:30 2026-06-17 07:25:07+05:30        29.6  67.426302  Dadar TT
+P-0004080 2026-06-17 07:25:22+05:30 2026-06-17 07:25:26+05:30        21.2  68.010942  Dadar TT
+P-0004081 2026-06-17 07:25:42+05:30 2026-06-17 07:25:46+05:30        24.8  68.630801  Dadar TT
+P-0004082 2026-06-17 07:26:02+05:30 2026-06-17 07:26:04+05:30        24.8  69.307027  Dadar TT
+P-0004083 2026-06-17 07:26:24+05:30 2026-06-17 07:26:25+05:30        26.2  70.013848  Dadar TT
+P-0004084 2026-06-17 07:26:42+05:30 2026-06-17 07:26:43+05:30        20.7  70.580588  Dadar TT
+P-0004085 2026-06-17 07:27:04+05:30 2026-06-17 07:27:07+05:30         3.8  70.538234  Dadar TT
+P-0004086 2026-06-17 07:27:22+05:30 2026-06-17 07:27:25+05:30         3.9  70.621678  Dadar TT
+P-0004087 2026-06-17 07:27:40+05:30 2026-06-17 07:27:42+05:30         5.0  70.621587  Dadar TT
+V-05 later rows anywhere in file: recorded_at later 0, received_at later 0.
+
+TRIP_005 first observed ping at/after V-05 target progress
+  ping_id               recorded_at  speed_kmph  along_pct near_stop
+P-0001221 2026-06-15 07:39:47+05:30        24.5  70.822019  Dadar TT
+
+4. ALL 17-JUNE TRIPS AT 07:45
+
+Raw 07:45 table
+ trip_id  route vehicle  operator           scheduled_start             scheduled_end                       status last_received_ping  received_age_min  polyline_pct  scheduled_time_pct  speed_kmph
+TRIP_013      9    V-11         5 2026-06-17 06:50:00+05:30 2026-06-17 07:45:00+05:30 scheduled end already passed          P-0003264               0.3          98.8               100.0        14.8
+TRIP_014     11    V-06         5 2026-06-17 06:46:00+05:30 2026-06-17 07:56:00+05:30                      running          P-0003518               0.1           0.1                84.3         0.7
+TRIP_015     12    V-10         5 2026-06-17 07:05:00+05:30 2026-06-17 08:05:00+05:30                      running          P-0003624               0.1          49.7                66.7        10.2
+TRIP_016     14    V-04         6 2026-06-17 06:40:00+05:30 2026-06-17 07:55:00+05:30                      running          P-0003828              48.0          22.3                86.7        13.3
+TRIP_017     17    V-05         5 2026-06-17 06:50:00+05:30 2026-06-17 07:55:00+05:30                      running          P-0004087              17.3          70.6                84.6         5.0
+TRIP_018     21    V-03         5 2026-06-17 07:20:00+05:30 2026-06-17 08:00:00+05:30                      running          P-0004162               0.1          62.8                62.5         8.9
+TRIP_019     21    V-09         7 2026-06-17 07:32:00+05:30 2026-06-17 08:12:00+05:30                      running          P-0004323               0.0          29.7                32.5         8.2
+
+5. ROUTE 21 PAIR
+
+Route 21 at 07:45
+    trip vehicle  operator                     start                       end  bookings      ping                  recorded                  received       lat       lon  along_pct  speed
+TRIP_018    V-03         5 2026-06-17 07:20:00+05:30 2026-06-17 08:00:00+05:30         6 P-0004162 2026-06-17 07:44:51+05:30 2026-06-17 07:44:52+05:30 19.074180 72.883848       62.8    8.9
+TRIP_019    V-09         7 2026-06-17 07:32:00+05:30 2026-06-17 08:12:00+05:30         6 P-0004323 2026-06-17 07:44:55+05:30 2026-06-17 07:44:59+05:30 19.082351 72.896286       29.7    8.2
+Straight-line separation of these two selected 07:45 positions: 1591.8m. They have distinct vehicle IDs and distinct ping IDs; the CSV alone does not establish whether one operationally shadows the other.
+
+6. SMALL ITEMS
+
+P-0003265
+  ping_id vehicle_id               recorded_at               received_at  lag_s
+P-0003265       V-11 2026-06-17 07:45:00+05:30 2026-06-17 07:45:01+05:30    1.0
+
+Duplicate-ID/time rows and their trip memberships
+  ping_id vehicle               recorded_at       lat       lon  speed     trip  route
+P-0002821    V-05 2026-06-16 07:47:16+05:30 19.019493 72.826388   18.8 TRIP_011     17
+P-0002821    V-11 2026-06-17 07:39:17+05:30 19.130639 72.912933   14.9 TRIP_013      9
+P-0003248    V-11 2026-06-17 07:39:17+05:30 19.130639 72.912933   14.9 TRIP_013      9
+
+All promised_eta mismatches by trip and route
+ trip_id  route_id                                                   bookings  count
+TRIP_017        17 BKG_0184, BKG_0185, BKG_0186, BKG_0187, BKG_0188, BKG_0189      6
+TRIP_018        21 BKG_0190, BKG_0191, BKG_0192, BKG_0193, BKG_0194, BKG_0195      6
+
+Why seven trips miss the <=100m endpoint observation rule
+    trip  route first_ping                first_time  closest_origin_m last_ping                 last_time  closest_dest_m
+TRIP_001      9  P-0000001 2026-06-15 06:54:00+05:30              12.7 P-0000164 2026-06-15 07:48:51+05:30           443.8
+TRIP_003     12  P-0000525 2026-06-15 07:08:00+05:30              11.1 P-0000706 2026-06-15 08:07:53+05:30           438.6
+TRIP_004     14  P-0000782 2026-06-15 06:35:00+05:30              10.5 P-0001009 2026-06-15 07:49:43+05:30             9.5
+TRIP_006     21  P-0001358 2026-06-15 07:21:00+05:30               3.8 P-0001477 2026-06-15 08:00:53+05:30           281.3
+TRIP_007      9  P-0001553 2026-06-16 06:45:00+05:30               6.0 P-0001718 2026-06-16 07:39:52+05:30           296.7
+TRIP_009     12  P-0002076 2026-06-16 07:02:00+05:30               9.9 P-0002255 2026-06-16 08:01:48+05:30           342.2
+TRIP_011     17  P-0002633 2026-06-16 06:45:00+05:30               7.0 P-0002828 2026-06-16 07:49:41+05:30           404.4
+
+END: descriptive output only.

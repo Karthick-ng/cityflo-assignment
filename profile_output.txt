@@ -1,0 +1,407 @@
+
+====================================================================================================
+ASSUMPTIONS AND SCOPE
+====================================================================================================
+1. Every offset-bearing timestamp is parsed with %Y-%m-%d %H:%M:%S%z and normalized to Asia/Kolkata.
+2. 'Mumbai bounds' means latitude 18.8 to 19.6 and longitude 72.7 to 73.3; it is a coarse data-quality screen.
+3. Reported speed >120 km/h or <0, and coordinate-implied speed >130 km/h, are flagged as implausible, not proved wrong.
+4. A ping is assigned to a trip only when its vehicle matches and recorded_at is inside that trip's scheduled window. This is for description, not a lateness model.
+5. 'Far from route' means >300 m from the stop polyline; sub-100m geometry is explicitly not over-interpreted.
+6. A stationary stretch is consecutive pings with reported speed <=1 km/h and movement <=25 m, lasting >=5 minutes.
+7. Boarding-stop scheduled time is a linear interpolation by stop-polyline distance; this is only a schedule consistency check.
+8. 'Future' is reported both relative to the run clock and relative to the requested 07:45 snapshot. Neither is a claim of bad data.
+9. No rows are filtered, corrected, excluded, or used to calculate lateness. Operator 7 and Route 12 remain included everywhere.
+
+====================================================================================================
+1. BASICS: SHAPE, TYPES, NULLS, TIMESTAMPS, FOREIGN KEYS
+====================================================================================================
+
+routes: 6 rows, 6 columns
+
+  columns / nulls
+               column dtype  nulls
+             route_id int64      0
+           route_name   str      0
+          origin_stop   str      0
+            dest_stop   str      0
+scheduled_runtime_min int64      0
+          stops_count int64      0
+
+stops: 48 rows, 6 columns
+
+  columns / nulls
+   column   dtype  nulls
+  stop_id     str      0
+stop_name     str      0
+      lat float64      0
+      lon float64      0
+ route_id   int64      0
+      seq   int64      0
+
+trips: 19 rows, 7 columns
+
+  columns / nulls
+         column                        dtype  nulls
+        trip_id                          str      0
+       route_id                        int64      0
+     vehicle_id                          str      0
+   service_date                          str      0
+scheduled_start datetime64[us, Asia/Kolkata]      0
+  scheduled_end datetime64[us, Asia/Kolkata]      0
+      direction                          str      0
+
+bookings: 201 rows, 6 columns
+
+  columns / nulls
+          column                        dtype  nulls
+      booking_id                          str      0
+         trip_id                          str      0
+        rider_id                          str      0
+boarding_stop_id                          str      0
+       booked_at datetime64[us, Asia/Kolkata]      0
+    promised_eta datetime64[us, Asia/Kolkata]      0
+
+gps_pings: 4,465 rows, 8 columns
+
+  columns / nulls
+     column                        dtype  nulls
+    ping_id                          str      0
+ vehicle_id                          str      0
+operator_id                        int64      0
+        lat                      float64      0
+        lon                      float64      0
+ speed_kmph                      float64      0
+recorded_at datetime64[us, Asia/Kolkata]      1
+received_at datetime64[us, Asia/Kolkata]      0
+
+Timestamp formats and ranges
+  scheduled_start: 2026-06-15 06:35:00+05:30 to 2026-06-17 07:32:00+05:30; raw format(s) {'DDDD-DD-DD DD:DD:DD+DD:DD': 19}; offsets {'+05:30': 19}; parse failures 0
+  scheduled_end: 2026-06-15 07:49:00+05:30 to 2026-06-17 08:12:00+05:30; raw format(s) {'DDDD-DD-DD DD:DD:DD+DD:DD': 19}; offsets {'+05:30': 19}; parse failures 0
+
+
+  booked_at: 2026-06-12 18:35:00+05:30 to 2026-06-16 22:50:00+05:30; raw format(s) {'DDDD-DD-DD DD:DD:DD+DD:DD': 201}; offsets {'+05:30': 201}; parse failures 0
+  promised_eta: 2026-06-15 06:35:00+05:30 to 2026-06-17 08:12:00+05:30; raw format(s) {'DDDD-DD-DD DD:DD:DD+DD:DD': 201}; offsets {'+05:30': 201}; parse failures 0
+
+
+  recorded_at: 2026-06-15 06:35:00+05:30 to 2026-06-17 08:34:50+05:30; raw format(s) {'DDDD-DD-DD DD:DD:DD+DD:DD': 4465}; offsets {'+05:30': 4465}; parse failures 1
+  received_at: 2026-06-15 06:35:02+05:30 to 2026-06-17 09:14:46+05:30; raw format(s) {'DDDD-DD-DD DD:DD:DD+DD:DD': 4465}; offsets {'+05:30': 4465}; parse failures 0
+
+All parseable timestamp offsets above must be +05:30 to be consistently IST.
+- Trips whose route_id does not resolve: 0; examples: None
+- Bookings whose trip_id does not resolve: 0; examples: None
+- Stops whose route_id does not resolve: 0; examples: None
+
+====================================================================================================
+2. GPS TWO-CLOCK PROFILE
+====================================================================================================
+
+Overall received_at - recorded_at, seconds
+   n  min  median  p95    p99    max
+4464  1.0     3.0  4.0 5400.0 5400.0
+
+Lag by recorded service date
+service_date    n  min_s  median_s  p95_s  p99_s  max_s
+  2026-06-15 1552    1.0       3.0    4.0    4.0    4.0
+  2026-06-16 1547    1.0       3.0    4.0    4.0    4.0
+  2026-06-17 1365    1.0       3.0 5400.0 5400.0 5400.0
+        <NA>    0    NaN       NaN    NaN    NaN    NaN
+
+Lag by vehicle
+vehicle_id   n  min_s  median_s  p95_s  p99_s  max_s
+      V-03 587    1.0       3.0    4.0    4.0    4.0
+      V-04 803    1.0       3.0 5400.0 5400.0 5400.0
+      V-05 658    1.0       2.0    4.0    4.0    4.0
+      V-06 759    1.0       3.0    4.0    4.0    4.0
+      V-09 181    1.0       3.0    4.0    4.0    4.0
+      V-10 755    1.0       3.0    4.0    4.0    4.0
+      V-11 721    1.0       3.0    4.0    4.0    4.0
+
+Lag by operator
+ operator_id    n  min_s  median_s  p95_s  p99_s  max_s
+           5 3480    1.0       3.0    4.0    4.0    4.0
+           6  803    1.0       3.0 5400.0 5400.0 5400.0
+           7  181    1.0       3.0    4.0    4.0    4.0
+- Negative lags (received before recorded): 0; examples: None
+
+Vehicles with consistent >=60s clock offset or >=30s/hour estimated lag drift
+vehicle_id   n  median_lag_s  lag_drift_s_per_hour                                      example_ping_ids
+      V-04 803           3.0                  76.2 P-0000782, P-0000783, P-0000784, P-0000785, P-0000786
+- Pings recorded outside every exact scheduled trip window: 1,205; examples: P-0000165, P-0000166, P-0000167, P-0000168, P-0000169
+
+Telemetry buffer around each scheduled trip (positive minutes are outside schedule)
+ trip_id  pings_before_start  pings_after_end  closest_pre_start_min  closest_post_end_min
+TRIP_001                   0               75                    NaN                   0.1
+TRIP_002                   0               75                    NaN                   0.1
+TRIP_003                   0               75                    NaN                   0.2
+TRIP_004                   0               76                    NaN                   0.1
+TRIP_005                   0               75                    NaN                   0.2
+TRIP_006                   0               75                    NaN                   0.2
+TRIP_007                   0               74                    NaN                   0.2
+TRIP_008                   0               74                    NaN                   0.2
+TRIP_009                   0               75                    NaN                   0.1
+TRIP_010                   0               76                    NaN                   0.1
+TRIP_011                   0               76                    NaN                   0.0
+TRIP_012                   0               75                    NaN                   0.1
+TRIP_013                   0               76                    NaN                   0.3
+TRIP_014                   0                0                    NaN                   NaN
+TRIP_015                   0               91                    NaN                   0.3
+TRIP_016                   0                0                    NaN                   NaN
+TRIP_017                   0                0                    NaN                   NaN
+TRIP_018                   0               76                    NaN                   0.0
+TRIP_019                   0               60                    NaN                   0.3
+- Pings recorded after script run time (2026-09-19 16:20 IST): 0; examples: None
+- Pings recorded after the requested 07:45 snapshot: 505; examples: P-0003266, P-0003267, P-0003268, P-0003269, P-0003270
+- 17 Jun pings recorded by 07:45 but received after 07:45: 146; examples: P-0003265, P-0003829, P-0003830, P-0003831, P-0003832
+
+Those not-yet-ingested-at-as-of pings
+  ping_id vehicle_id               recorded_at               received_at  lag_s
+P-0003265       V-11 2026-06-17 07:45:00+05:30 2026-06-17 07:45:01+05:30    1.0
+P-0003829       V-04 2026-06-17 06:57:13+05:30 2026-06-17 08:27:13+05:30 5400.0
+P-0003830       V-04 2026-06-17 06:57:35+05:30 2026-06-17 08:27:35+05:30 5400.0
+P-0003831       V-04 2026-06-17 06:57:52+05:30 2026-06-17 08:27:52+05:30 5400.0
+P-0003832       V-04 2026-06-17 06:58:12+05:30 2026-06-17 08:28:12+05:30 5400.0
+P-0003833       V-04 2026-06-17 06:58:30+05:30 2026-06-17 08:28:30+05:30 5400.0
+P-0003834       V-04 2026-06-17 06:58:52+05:30 2026-06-17 08:28:52+05:30 5400.0
+P-0003835       V-04 2026-06-17 06:59:15+05:30 2026-06-17 08:29:15+05:30 5400.0
+P-0003836       V-04 2026-06-17 06:59:38+05:30 2026-06-17 08:29:38+05:30 5400.0
+P-0003837       V-04 2026-06-17 06:59:58+05:30 2026-06-17 08:29:58+05:30 5400.0
+P-0003838       V-04 2026-06-17 07:00:20+05:30 2026-06-17 08:30:20+05:30 5400.0
+P-0003839       V-04 2026-06-17 07:00:43+05:30 2026-06-17 08:30:43+05:30 5400.0
+P-0003840       V-04 2026-06-17 07:01:04+05:30 2026-06-17 08:31:04+05:30 5400.0
+P-0003841       V-04 2026-06-17 07:01:24+05:30 2026-06-17 08:31:24+05:30 5400.0
+P-0003842       V-04 2026-06-17 07:01:42+05:30 2026-06-17 08:31:42+05:30 5400.0
+P-0003843       V-04 2026-06-17 07:02:00+05:30 2026-06-17 08:32:00+05:30 5400.0
+P-0003844       V-04 2026-06-17 07:02:17+05:30 2026-06-17 08:32:17+05:30 5400.0
+P-0003845       V-04 2026-06-17 07:02:34+05:30 2026-06-17 08:32:34+05:30 5400.0
+P-0003846       V-04 2026-06-17 07:02:52+05:30 2026-06-17 08:32:52+05:30 5400.0
+P-0003847       V-04 2026-06-17 07:03:10+05:30 2026-06-17 08:33:10+05:30 5400.0
+  ... 126 more rows suppressed
+
+====================================================================================================
+3. PING QUALITY
+====================================================================================================
+- Rows sharing a duplicate ping_id: 2; examples: P-0002821
+- Rows sharing (vehicle_id, recorded_at): 2; examples: P-0003248, P-0002821
+- Pings whose recorded_at goes backwards in received_at order: 0; examples: None
+- Reported speeds <0 or >120 km/h: 4; examples: P-0003148, P-0003149, P-0003150, P-0003995
+- Coordinates outside coarse Mumbai bounds: 3; examples: P-0003148, P-0003149, P-0003150
+- Consecutive-coordinate implied speeds >130 km/h: 4; examples: P-0003148, P-0003149, P-0003150, P-0003151
+
+Implied-speed examples
+  ping_id vehicle_id  delta_s  move_m  implied_kmph
+P-0003148       V-11     20.0 80033.9       14406.1
+P-0003149       V-11     23.0 98892.9       15478.9
+P-0003150       V-11     20.0 16613.7        2990.5
+P-0003151       V-11     19.0 68411.5       12962.2
+
+Ping frequency by vehicle
+vehicle_id  pings  median_gap_s  max_gap_s
+      V-03    586          20.0    82511.0
+      V-04    802          20.0    81008.0
+      V-05    657          20.0    81300.0
+      V-06    758          20.0    81012.0
+      V-09    180          20.0       23.0
+      V-10    754          20.0    82085.0
+      V-11    720          20.0    81906.0
+- Inter-ping gaps longer than 3 minutes: 12; examples: P-0002905, P-0004088, P-0002331, P-0003777, P-0002633
+
+Longest gaps
+  ping_id vehicle_id               recorded_at  delta_s
+P-0002905       V-03 2026-06-16 07:21:00+05:30  82511.0
+P-0004088       V-03 2026-06-17 07:20:00+05:30  82445.0
+P-0003534       V-10 2026-06-17 07:15:00+05:30  82085.0
+P-0003101       V-11 2026-06-17 06:50:00+05:30  81906.0
+P-0003974       V-05 2026-06-17 06:50:00+05:30  81300.0
+P-0001553       V-11 2026-06-16 06:45:00+05:30  81072.0
+P-0003342       V-06 2026-06-17 06:46:00+05:30  81012.0
+P-0002331       V-04 2026-06-16 06:45:00+05:30  81008.0
+P-0002076       V-10 2026-06-16 07:02:00+05:30  80949.0
+P-0001793       V-06 2026-06-16 06:41:00+05:30  80760.0
+P-0002633       V-05 2026-06-16 06:45:00+05:30  80408.0
+P-0003777       V-04 2026-06-17 06:40:00+05:30  80111.0
+
+Stationary stretches >=5 min (all; labelled geometrically)
+  None
+
+====================================================================================================
+4. ENTITY CONSISTENCY
+====================================================================================================
+- Vehicles in pings but not trips: 0; examples: None
+- Vehicles in trips but not pings: 0; examples: None
+- Trips with zero pings in their exact scheduled window: 0; examples: None
+- Vehicles with other than exactly one operator_id: 0; examples: None
+
+Operator inconsistencies
+  None
+- Trips that overlap or exactly abut a previous trip for that vehicle: 0; examples: None
+
+Overlapping/back-to-back trip details
+  None
+- Pings falling in two or more scheduled windows for one vehicle: 0; examples: None
+
+====================================================================================================
+5. REFERENCE DATA AND ROUTE-GEOMETRY CHECKS
+====================================================================================================
+
+Declared versus actual stop counts
+ route_id              route_name       origin_stop    dest_stop  scheduled_runtime_min  stops_count  actual_stop_rows  difference
+        9           Thane → Powai     Ghodbunder Rd  Hiranandani                     55            7                 7           0
+       11          Borivali → BKC      Borivali Stn  BKC G-Block                     70            9                 9           0
+       12      Mulund → Andheri E Mulund Check Naka      Chakala                     60            8                 8           0
+       14 Kandivali → Lower Parel       Kandivali E Kamala Mills                     75           10                10           0
+       17           Vashi → Worli   Vashi Sector 17   Worli Naka                     65            8                 8           0
+       21         Ghatkopar → BKC   Ghatkopar Metro          BKC                     40            6                 6           0
+
+Runtime agreement by route
+ route_id  trips  declared_min  actual_min  min_difference  max_difference
+        9      3            55        55.0             0.0             0.0
+       11      3            70        70.0             0.0             0.0
+       12      3            60        60.0             0.0             0.0
+       14      3            75        75.0             0.0             0.0
+       17      3            65        65.0             0.0             0.0
+       21      4            40        40.0             0.0             0.0
+- Trips whose scheduled interval differs from route runtime: 0; examples: None
+
+Stop sequence completeness summary
+ route_id  rows  min_seq  max_seq  unique_seq  missing_or_duplicate
+        9     7        1        7           7                 False
+       11     9        1        9           9                 False
+       12     8        1        8           8                 False
+       14    10        1       10          10                 False
+       17     8        1        8           8                 False
+       21     6        1        6           6                 False
+- Stops with duplicate route_id/seq: 0; examples: None
+- Stop coordinates outside coarse Mumbai bounds: 0; examples: None
+
+Stop-order geographic screen (map-free: zero-length or >5km adjacent jumps)
+ route_id  segments  shortest_segment_km  longest_segment_km  near_zero_segments  segments_over_5km
+        9         6                1.863               2.767                   0                  0
+       11         8                1.907               2.507                   0                  0
+       12         7                1.180               2.019                   0                  0
+       14         9                2.101               2.876                   0                  0
+       17         7                2.514               3.423                   0                  0
+       21         5                0.593               1.130                   0                  0
+Interpretation limit: this map-free screen can flag pathological adjacent jumps, but cannot prove a road-realistic stop order.
+
+Route polyline lengths and schedule-implied average speed
+ route_id  polyline_km  runtime_min  implied_avg_kmph  longest_stop_segment_km
+        9        13.46         55.0              14.7                     2.77
+       11        18.19         70.0              15.6                     2.51
+       12        11.41         60.0              11.4                     2.02
+       14        22.62         75.0              18.1                     2.88
+       17        20.63         65.0              19.0                     3.42
+       21         4.84         40.0               7.3                     1.13
+
+Assigned-ping distances from route polyline
+vehicle_id  route_id  pings  median_distance_m  p95_distance_m  far_pings  far_share_pct
+      V-03        21    361                5.9            14.0          0            0.0
+      V-04        14    651                6.2            12.2          0            0.0
+      V-05        17    507                6.3            13.9          0            0.0
+      V-06        11    610                7.0            12.7          0            0.0
+      V-09        21    121                5.7            12.2          0            0.0
+      V-10        12    514                5.9            13.9          0            0.0
+      V-11         9    496                5.4            13.4          3            0.6
+- Vehicle-route pair consistently far (>300m for >=50% of >=5 assigned pings): 0; examples: None
+
+====================================================================================================
+6. BOOKINGS
+====================================================================================================
+
+Bookings per trip
+ trip_id  route_id vehicle_id  bookings
+TRIP_001         9       V-11         9
+TRIP_002        11       V-06         7
+TRIP_003        12       V-10         9
+TRIP_004        14       V-04        12
+TRIP_005        17       V-05        14
+TRIP_006        21       V-03         6
+TRIP_007         9       V-11        16
+TRIP_008        11       V-06        16
+TRIP_009        12       V-10         9
+TRIP_010        14       V-04        16
+TRIP_011        17       V-05        12
+TRIP_012        21       V-03         6
+TRIP_013         9       V-11        12
+TRIP_014        11       V-06         8
+TRIP_015        12       V-10         9
+TRIP_016        14       V-04        12
+TRIP_017        17       V-05        16
+TRIP_018        21       V-03         6
+TRIP_019        21       V-09         6
+- Bookings made after their trip's scheduled start: 0; examples: None
+- Bookings whose boarding stop is not found on their trip route: 0; examples: None
+- Promised ETAs differing by >60s from polyline-interpolated schedule: 12; examples: BKG_0184, BKG_0185, BKG_0186, BKG_0187, BKG_0188
+
+Promised-ETA consistency examples
+booking_id  trip_id boarding_stop_id              promised_eta                expected_stop_eta  eta_difference_s
+  BKG_0185 TRIP_017           S-1708 2026-06-17 07:17:12+05:30        2026-06-17 07:55:00+05:30      -2268.000000
+  BKG_0186 TRIP_017           S-1707 2026-06-17 07:08:42+05:30 2026-06-17 07:44:55.830967+05:30      -2173.830967
+  BKG_0187 TRIP_017           S-1708 2026-06-17 07:26:16+05:30        2026-06-17 07:55:00+05:30      -1724.000000
+  BKG_0190 TRIP_018           S-2102 2026-06-17 07:09:31+05:30 2026-06-17 07:28:31.697314+05:30      -1140.697314
+  BKG_0193 TRIP_018           S-2103 2026-06-17 07:18:52+05:30 2026-06-17 07:37:52.627269+05:30      -1140.627269
+  BKG_0195 TRIP_018           S-2103 2026-06-17 07:18:52+05:30 2026-06-17 07:37:52.627269+05:30      -1140.627269
+  BKG_0192 TRIP_018           S-2103 2026-06-17 07:18:52+05:30 2026-06-17 07:37:52.627269+05:30      -1140.627269
+  BKG_0191 TRIP_018           S-2105 2026-06-17 07:32:14+05:30 2026-06-17 07:51:14.017302+05:30      -1140.017302
+  BKG_0194 TRIP_018           S-2106 2026-06-17 07:41:00+05:30        2026-06-17 08:00:00+05:30      -1140.000000
+  BKG_0184 TRIP_017           S-1707 2026-06-17 07:26:16+05:30 2026-06-17 07:44:55.830967+05:30      -1119.830967
+  BKG_0189 TRIP_017           S-1708 2026-06-17 07:44:55+05:30        2026-06-17 07:55:00+05:30       -605.000000
+  BKG_0188 TRIP_017           S-1707 2026-06-17 07:35:53+05:30 2026-06-17 07:44:55.830967+05:30       -542.830967
+
+====================================================================================================
+7. WHAT THE TWO RECONCILIATION RULES WOULD HIDE (DESCRIPTIVE ONLY)
+====================================================================================================
+Operator 7: 1 vehicles (V-09); 1 trips (TRIP_019); 181 pings (P-0004284, P-0004285, P-0004286, P-0004287, P-0004288); 6 bookings; 6 distinct riders (R-1296, R-1213, R-1133, R-1205, R-1186).
+
+Operator 7 routes
+ route_id  trips vehicles  bookings
+       21      1     V-09         6
+
+All operators represented by each route's vehicles
+ route_id operator_id
+        9         [5]
+       11         [5]
+       12         [5]
+       14         [6]
+       17         [5]
+       21      [5, 7]
+- Routes represented only by operator 7 in this extract: 0; examples: None
+
+Operator 7 versus other-operator clock/duplicate/gap profile
+ operator_group  pings  vehicles  median_lag_s  p95_lag_s  negative_lags  duplicate_ping_id  long_gaps
+     operator_7    181         1           3.0        4.0              0                  0          0
+other_operators   4284         6           3.0        4.0              0                  2         12
+Route 12: 3 trips (TRIP_003, TRIP_009, TRIP_015); 27 bookings; 26 riders (R-1096, R-1273, R-1016, R-1295, R-1035); vehicle/operators {'V-10': [5]}.
+
+Route 12: raw schedule and telemetry coverage by morning
+ trip_id service_date vehicle_id           scheduled_start             scheduled_end  pings_in_scheduled_window            first_recorded             last_recorded  ping_rows
+TRIP_003   2026-06-15       V-10 2026-06-15 07:08:00+05:30 2026-06-15 08:08:00+05:30                        182 2026-06-15 07:08:00+05:30 2026-06-15 08:07:53+05:30        182
+TRIP_009   2026-06-16       V-10 2026-06-16 07:02:00+05:30 2026-06-16 08:02:00+05:30                        180 2026-06-16 07:02:00+05:30 2026-06-16 08:01:48+05:30        180
+TRIP_015   2026-06-17       V-10 2026-06-17 07:05:00+05:30 2026-06-17 08:05:00+05:30                        152 2026-06-17 07:15:00+05:30 2026-06-17 08:04:59+05:30        152
+
+====================================================================================================
+8. 07:45 IST SNAPSHOT ON 2026-06-17 (DESCRIPTIVE ONLY)
+====================================================================================================
+
+Trips scheduled / in progress / not yet started at 07:45
+ route_id  trips_scheduled  in_progress  not_yet_started
+        9                1            0                0
+       11                1            1                0
+       12                1            1                0
+       14                1            1                0
+       17                1            1                0
+       21                2            2                0
+
+Active vehicles: most recent pings under each clock cutoff
+ route_id  trip_id vehicle_id last_by_received_ping_id          last_received_at  received_age_min last_by_recorded_ping_id          last_recorded_at  recorded_age_min
+       11 TRIP_014       V-06                P-0003518 2026-06-17 07:44:54+05:30               0.1                P-0003518 2026-06-17 07:44:51+05:30               0.1
+       12 TRIP_015       V-10                P-0003624 2026-06-17 07:44:53+05:30               0.1                P-0003624 2026-06-17 07:44:51+05:30               0.1
+       14 TRIP_016       V-04                P-0003828 2026-06-17 06:56:57+05:30              48.0                P-0003973 2026-06-17 07:44:46+05:30               0.2
+       17 TRIP_017       V-05                P-0004087 2026-06-17 07:27:42+05:30              17.3                P-0004087 2026-06-17 07:27:40+05:30              17.3
+       21 TRIP_018       V-03                P-0004162 2026-06-17 07:44:52+05:30               0.1                P-0004162 2026-06-17 07:44:51+05:30               0.1
+       21 TRIP_019       V-09                P-0004323 2026-06-17 07:44:59+05:30               0.0                P-0004323 2026-06-17 07:44:55+05:30               0.1
+- Active routes with no usable ping by either cutoff: 0; examples: None
+
+====================================================================================================
+END OF DESCRIPTIVE PROFILE
+====================================================================================================
+The script intentionally does not rank routes, produce a lateness value, make operational recommendations, or apply reconciliation rules.

@@ -1,0 +1,74 @@
+ASSUMPTIONS
+1. Timestamps are explicit IST values.
+2. Trip pings share vehicle_id and have recorded_at within exact scheduled bounds.
+3. Direction-aware fraction uses origin-to-destination geometry for inbound, and 100 minus it for outbound.
+4. Near terminus means <=100m from first or last listed stop; slow/stationary means speed <=1 km/h.
+5. Five-minute samples select the last recorded ping in each 5-minute bucket; no interpolation.
+6. No reconciliation rule, exclusion, lateness metric, or operational verdict is applied.
+
+1. DIRECTION VALUES
+
+All trips and direction
+ trip_id  route_id vehicle_id service_date direction           scheduled_start             scheduled_end
+TRIP_001         9       V-11   2026-06-15   inbound 2026-06-15 06:54:00+05:30 2026-06-15 07:49:00+05:30
+TRIP_002        11       V-06   2026-06-15   inbound 2026-06-15 06:40:00+05:30 2026-06-15 07:50:00+05:30
+TRIP_003        12       V-10   2026-06-15   inbound 2026-06-15 07:08:00+05:30 2026-06-15 08:08:00+05:30
+TRIP_004        14       V-04   2026-06-15   inbound 2026-06-15 06:35:00+05:30 2026-06-15 07:50:00+05:30
+TRIP_005        17       V-05   2026-06-15   inbound 2026-06-15 06:55:00+05:30 2026-06-15 08:00:00+05:30
+TRIP_006        21       V-03   2026-06-15   inbound 2026-06-15 07:21:00+05:30 2026-06-15 08:01:00+05:30
+TRIP_007         9       V-11   2026-06-16   inbound 2026-06-16 06:45:00+05:30 2026-06-16 07:40:00+05:30
+TRIP_008        11       V-06   2026-06-16   inbound 2026-06-16 06:41:00+05:30 2026-06-16 07:51:00+05:30
+TRIP_009        12       V-10   2026-06-16   inbound 2026-06-16 07:02:00+05:30 2026-06-16 08:02:00+05:30
+TRIP_010        14       V-04   2026-06-16   inbound 2026-06-16 06:45:00+05:30 2026-06-16 08:00:00+05:30
+TRIP_011        17       V-05   2026-06-16   inbound 2026-06-16 06:45:00+05:30 2026-06-16 07:50:00+05:30
+TRIP_012        21       V-03   2026-06-16   inbound 2026-06-16 07:21:00+05:30 2026-06-16 08:01:00+05:30
+TRIP_013         9       V-11   2026-06-17   inbound 2026-06-17 06:50:00+05:30 2026-06-17 07:45:00+05:30
+TRIP_014        11       V-06   2026-06-17   inbound 2026-06-17 06:46:00+05:30 2026-06-17 07:56:00+05:30
+TRIP_015        12       V-10   2026-06-17   inbound 2026-06-17 07:05:00+05:30 2026-06-17 08:05:00+05:30
+TRIP_016        14       V-04   2026-06-17   inbound 2026-06-17 06:40:00+05:30 2026-06-17 07:55:00+05:30
+TRIP_017        17       V-05   2026-06-17   inbound 2026-06-17 06:50:00+05:30 2026-06-17 07:55:00+05:30
+TRIP_018        21       V-03   2026-06-17   inbound 2026-06-17 07:20:00+05:30 2026-06-17 08:00:00+05:30
+TRIP_019        21       V-09   2026-06-17   inbound 2026-06-17 07:32:00+05:30 2026-06-17 08:12:00+05:30
+All 19 rows are inbound. Therefore all previous polyline fractions already run in the stated direction of travel; no recomputation changes a value. If any row were outbound, its direction-of-travel fraction would be 100 - origin-based fraction.
+
+2. V-06 / TRIP_014
+
+V-06: 5-minute samples from scheduled start through 07:45
+  ping_id               recorded_at               received_at  speed_kmph  polyline_origin_pct  travel_direction_pct    near_stop near_stop_id near_stop_m
+P-0003353 2026-06-17 06:49:39+05:30 2026-06-17 06:49:41+05:30         1.6             0.020008              0.020008 Borivali Stn       S-1101    9.516108
+P-0003369 2026-06-17 06:54:57+05:30 2026-06-17 06:55:01+05:30         1.8             0.000000              0.000000 Borivali Stn       S-1101   12.429331
+P-0003383 2026-06-17 06:59:40+05:30 2026-06-17 06:59:42+05:30         1.6             0.000000              0.000000 Borivali Stn       S-1101   13.456167
+P-0003398 2026-06-17 07:04:45+05:30 2026-06-17 07:04:48+05:30         0.6             0.000000              0.000000 Borivali Stn       S-1101    6.031918
+P-0003414 2026-06-17 07:09:49+05:30 2026-06-17 07:09:53+05:30         1.0             0.055207              0.055207 Borivali Stn       S-1101   14.524386
+P-0003429 2026-06-17 07:14:43+05:30 2026-06-17 07:14:46+05:30         0.0             0.013564              0.013564 Borivali Stn       S-1101   11.519179
+P-0003444 2026-06-17 07:19:55+05:30 2026-06-17 07:19:56+05:30         0.8             0.000000              0.000000 Borivali Stn       S-1101    15.86899
+P-0003458 2026-06-17 07:24:40+05:30 2026-06-17 07:24:42+05:30         0.3             0.000000              0.000000 Borivali Stn       S-1101    5.268376
+P-0003473 2026-06-17 07:29:55+05:30 2026-06-17 07:29:59+05:30         0.0             0.011971              0.011971 Borivali Stn       S-1101   12.002024
+P-0003488 2026-06-17 07:34:56+05:30 2026-06-17 07:34:57+05:30         1.2             0.000000              0.000000 Borivali Stn       S-1101    3.520993
+P-0003503 2026-06-17 07:39:57+05:30 2026-06-17 07:40:01+05:30         1.1             0.000000              0.000000 Borivali Stn       S-1101   15.230992
+P-0003518 2026-06-17 07:44:51+05:30 2026-06-17 07:44:54+05:30         0.7             0.072978              0.072978 Borivali Stn       S-1101   17.254107
+Last pre-07:45: P-0003518, 2026-06-17 07:44:51+05:30, 0.7 km/h, 0.1% direction-aware, nearest Borivali Stn 17.3m.
+First observed within 100m of current nearest stop (Borivali Stn): 2026-06-17 06:46:00+05:30 (P-0003342), 177 qualifying pings.
+Contiguous <=1 km/h tail: 4 pings, 2026-06-17 07:43:53+05:30 to 2026-06-17 07:44:51+05:30, 1.0 minutes.
+
+3. ROUTE 11 COMPARISON
+
+Route 11 trip starts
+    trip       date direction                     start                       end first_ping           first_ping_time  direction_pct nearest_stop  distance_m
+TRIP_002 2026-06-15   inbound 2026-06-15 06:40:00+05:30 2026-06-15 07:50:00+05:30  P-0000240 2026-06-15 06:40:00+05:30            0.0 Borivali Stn         8.8
+TRIP_008 2026-06-16   inbound 2026-06-16 06:41:00+05:30 2026-06-16 07:51:00+05:30  P-0001793 2026-06-16 06:41:00+05:30            0.0 Borivali Stn        10.9
+TRIP_014 2026-06-17   inbound 2026-06-17 06:46:00+05:30 2026-06-17 07:56:00+05:30  P-0003342 2026-06-17 06:46:00+05:30            0.0 Borivali Stn        12.6
+
+4. EARLIER-CODE DIRECTION AUDIT
+profile.py: polyline-distance proximity, route length, stop counts, and far-from-route checks do not require direction. Its displayed progress only appears in later scripts, not profile.py.
+drill.py: V-04/V-05 samples, Route 12 progress, and 07:45 route fractions used origin-based polyline percentage without consulting direction.
+drill2.py: fixed-clock polyline percentages, V-05/Route 12 comparisons, raw 07:45 table, Route 21 positions, and endpoint labels used origin-based percentage without consulting direction.
+For this extract all directions are inbound, so those output values are unaffected. An outbound row would require reversing percentage to 100 - origin-based percentage and swapping origin/destination endpoint interpretation.
+
+5. OTHER TERMINUS / MID-TRIP PATTERN SCREEN
+
+Mid-schedule slow/stationary pings within 100m of a terminus
+    trip  route      ping               recorded_at     terminus  speed_kmph
+TRIP_014     11 P-0003357 2026-06-17 06:51:01+05:30 Borivali Stn         0.1
+
+END: descriptive direction check only.

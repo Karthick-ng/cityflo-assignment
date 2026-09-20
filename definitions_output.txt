@@ -1,0 +1,84 @@
+ASSUMPTIONS
+1. Only pings with received_at <= evaluation time are eligible. 2. Latest received eligible ping supplies position/speed. 3. Linear polyline progress is used. 4. A uses uniform scheduled progress. 5. B uses per-route historical observed endpoint runtime where available, anchored at scheduled start. 6. C uses only bookings at stops not yet passed, and reports median(now-promised_eta). 7. D assumes current reported speed stays constant; speed <=0 is undefined. 8. Freshness is reported, not thresholded. 9. No reconciliation rule is applied and no candidate is selected.
+
+FORMULAS (positive output means later than the comparison time)
+A timetable: A = t - [scheduled_start + f * (scheduled_end-scheduled_start)]. Needs one received ping, position f, and fresh enough telemetry.
+B history: B = t - [scheduled_start + f * median(historical observed route runtime)]. Needs A plus comparable completed historical runtimes; unavailable where history is missing.
+C promise: C = median over not-yet-passed booked stops of [t - promised_eta]. Needs a received ping, stop position, and at least one upcoming booking.
+D speed: D = [t + remaining_polyline_km/current_speed_kmph*60] - scheduled_end. Needs a received ping, valid positive speed, and a speed representative of future travel.
+
+15/16 June 5-minute backtest distributions
+ definition   n  median_min  p95_min  max_min
+A_timetable 146        0.18     1.82     2.33
+  B_history 100        0.06     1.26     2.51
+  C_promise 146      -15.75     0.00     0.00
+    D_speed 146        0.03    20.30    50.95
+
+Historical 5-minute rows where any candidate >3 min
+    trip  route                      time  A_timetable  B_history  C_promise   D_speed  ping_age_min
+TRIP_001      9 2026-06-15 06:59:00+05:30     0.454744        NaN -21.933333 22.706222      0.250000
+TRIP_001      9 2026-06-15 07:04:00+05:30     0.553875        NaN -16.933333  8.565487      0.200000
+TRIP_001      9 2026-06-15 07:09:00+05:30     0.648478        NaN -11.933333  5.608180      0.183333
+TRIP_001      9 2026-06-15 07:24:00+05:30     1.255815        NaN -25.000000  5.149859      0.283333
+TRIP_002     11 2026-06-15 07:00:00+05:30     0.047537   0.104545 -19.308333  7.034159      0.316667
+TRIP_002     11 2026-06-15 07:05:00+05:30    -0.245664  -0.173534 -14.308333  6.002028      0.133333
+TRIP_002     11 2026-06-15 07:10:00+05:30    -0.259148  -0.172694 -18.708333  3.087131      0.166667
+TRIP_003     12 2026-06-15 07:38:00+05:30     1.359096        NaN  -5.116667  3.176357      0.233333
+TRIP_003     12 2026-06-15 07:43:00+05:30     1.675365        NaN  -0.116667  4.027524      0.283333
+TRIP_003     12 2026-06-15 07:53:00+05:30     2.039938        NaN -15.000000  4.469596      0.250000
+TRIP_004     14 2026-06-15 06:45:00+05:30     0.175625   0.201823 -48.433333 10.688939      0.250000
+TRIP_004     14 2026-06-15 06:50:00+05:30    -0.189093  -0.148589 -43.433333  5.274584      0.000000
+TRIP_004     14 2026-06-15 06:55:00+05:30    -0.226304  -0.172367 -38.433333  6.633664      0.033333
+TRIP_004     14 2026-06-15 07:00:00+05:30    -0.218363  -0.151114 -33.433333  8.945351      0.166667
+TRIP_004     14 2026-06-15 07:25:00+05:30    -0.428468  -0.293992 -13.125000 10.050993      0.233333
+TRIP_005     17 2026-06-15 07:00:00+05:30     0.080711   0.088279 -31.266667 31.633920      0.150000
+TRIP_005     17 2026-06-15 07:05:00+05:30    -0.078163  -0.062658 -35.591667 10.441958      0.133333
+TRIP_005     17 2026-06-15 07:35:00+05:30    -0.782742  -0.719999 -25.000000  6.841109      0.250000
+TRIP_006     21 2026-06-15 07:26:00+05:30     0.498361   0.520869  -3.516667 50.946719      0.083333
+TRIP_006     21 2026-06-15 07:31:00+05:30     0.940774   0.986070 -25.616667  3.049472      0.316667
+TRIP_006     21 2026-06-15 07:46:00+05:30     1.558155   1.675365 -10.616667 11.726476      0.100000
+TRIP_007      9 2026-06-16 06:50:00+05:30     0.325462        NaN -36.016667  3.216060      0.116667
+TRIP_007      9 2026-06-16 07:00:00+05:30     0.442495        NaN -29.833333 10.376231      0.100000
+TRIP_007      9 2026-06-16 07:05:00+05:30     0.600847        NaN -24.833333 11.720992      0.116667
+TRIP_007      9 2026-06-16 07:15:00+05:30     0.738593        NaN -25.000000  4.555926      0.066667
+TRIP_008     11 2026-06-16 07:01:00+05:30     0.275445   0.331801 -33.333333 22.011578      0.216667
+TRIP_008     11 2026-06-16 07:11:00+05:30     0.132676   0.218011 -23.333333 20.832237      0.116667
+TRIP_008     11 2026-06-16 07:31:00+05:30     0.187024   0.329347 -12.650000  4.622675      0.150000
+TRIP_009     12 2026-06-16 07:32:00+05:30     1.026691        NaN -30.000000  8.533331      0.166667
+TRIP_009     12 2026-06-16 07:47:00+05:30     1.525719        NaN -15.000000  5.523973      0.283333
+TRIP_009     12 2026-06-16 07:52:00+05:30     1.547413        NaN -10.000000  5.522251      0.100000
+TRIP_010     14 2026-06-16 06:55:00+05:30     0.154789   0.181043 -40.950000 18.714183      0.183333
+TRIP_010     14 2026-06-16 07:00:00+05:30     0.071953   0.111761 -35.950000 25.022447      0.150000
+TRIP_010     14 2026-06-16 07:05:00+05:30     0.023883   0.077153 -34.691667  5.782590      0.166667
+TRIP_010     14 2026-06-16 07:10:00+05:30    -0.158732  -0.091642 -29.691667  9.404222      0.033333
+TRIP_010     14 2026-06-16 07:30:00+05:30    -0.018488   0.101561 -13.433333  9.076039      0.316667
+TRIP_011     17 2026-06-16 06:50:00+05:30     0.420802   0.427847 -13.700000 26.609605      0.250000
+TRIP_011     17 2026-06-16 07:25:00+05:30     0.849391   0.909623 -15.441667  3.819433      0.216667
+TRIP_011     17 2026-06-16 07:30:00+05:30     0.899486   0.967333 -10.441667  7.669693      0.183333
+TRIP_011     17 2026-06-16 07:35:00+05:30     1.061072   1.136362 -15.000000  4.503209      0.300000
+
+17 June 07:45 candidate outputs (minutes)
+    trip  route vehicle  A_timetable  B_history  C_promise     D_speed  ping_age_min  spread_max_min
+TRIP_013      9    V-11     0.677813        NaN   0.000000    0.673159      0.266667        0.677813
+TRIP_014     11    V-06    58.948915  58.949061   5.633333 1549.112235      0.100000     1543.478901
+TRIP_015     12    V-10    10.185137        NaN -20.000000   13.812859      0.116667       33.812859
+TRIP_016     14    V-04    48.274678  48.319279  14.050000   69.377982     48.050000       55.327982
+TRIP_017     17    V-05     9.095968   9.166590  18.733333   62.811989     17.300000       53.716021
+TRIP_018     21    V-03    -0.132444  -0.006782   8.383333   -2.866340      0.133333       11.249673
+TRIP_019     21    V-09     1.125546   1.184918  -9.766667   -2.086808      0.016667       10.951585
+
+Rows with candidate spread >3 minutes
+    trip  route vehicle  A_timetable  B_history  C_promise     D_speed  ping_age_min  spread_max_min
+TRIP_014     11    V-06    58.948915  58.949061   5.633333 1549.112235      0.100000     1543.478901
+TRIP_015     12    V-10    10.185137        NaN -20.000000   13.812859      0.116667       33.812859
+TRIP_016     14    V-04    48.274678  48.319279  14.050000   69.377982     48.050000       55.327982
+TRIP_017     17    V-05     9.095968   9.166590  18.733333   62.811989     17.300000       53.716021
+TRIP_018     21    V-03    -0.132444  -0.006782   8.383333   -2.866340      0.133333       11.249673
+TRIP_019     21    V-09     1.125546   1.184918  -9.766667   -2.086808      0.016667       10.951585
+
+ARGUMENTS AGAINST EACH CANDIDATE
+A: TRIP_014 / P-0003518 has fresh received telemetry near the origin while the schedule clock is mid-trip; A converts that observation directly into a large number without independently validating the GPS interpretation.
+B: Route 12 has no qualifying historical endpoint-runtime observations under the stated 100m rule, so TRIP_015 is unavailable rather than robustly estimated.
+C: TRIP_013 may have no upcoming booked stop when it is near 98.8% route progress at P-0003264; absence of an upcoming promise makes C undefined even though GPS exists.
+D: TRIP_014 / P-0003518 has speed 0.7 km/h, making constant-speed extrapolation extreme; speed 0 produces division by zero / undefined.
+END exploratory metrics only; no definition or threshold selected.

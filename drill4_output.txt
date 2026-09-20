@@ -1,0 +1,32 @@
+ASSUMPTIONS
+1. IST timestamps. 2. A trip ping is same vehicle, recorded within exact schedule. 3. Near a stop is <=100m. 4. Moving departure is speed >5 km/h. 5. Net-displacement screen uses first/last GPS fixes in a 10-minute recorded-time window and <100m net displacement. 6. Window locations use the start ping nearest stop; no map matching. 7. No rows/rules are excluded.
+
+1. TRIP_014 bookings
+booking_id rider_id boarding_stop_id   stop_name              promised_eta
+  BKG_0145   R-1251           S-1109 BKC G-Block 2026-06-17 07:56:00+05:30
+  BKG_0146   R-1158           S-1108       Kurla 2026-06-17 07:48:39+05:30
+  BKG_0147   R-1193           S-1109 BKC G-Block 2026-06-17 07:56:00+05:30
+  BKG_0148   R-1266           S-1105  Goregaon E 2026-06-17 07:20:32+05:30
+  BKG_0149   R-1120           S-1105  Goregaon E 2026-06-17 07:20:32+05:30
+  BKG_0150   R-1079           S-1109 BKC G-Block 2026-06-17 07:56:00+05:30
+  BKG_0151   R-1002           S-1103  Borivali E 2026-06-17 07:04:36+05:30
+  BKG_0152   R-1232           S-1106       Aarey 2026-06-17 07:30:05+05:30
+Promised ETAs are schedule-derived values in bookings.csv; they can be compared to scheduled stop interpolation but cannot independently confirm whether V-06 departed.
+
+2. All net displacement <100m over >=10 min windows
+    trip                    bucket  route vehicle start_ping  end_ping                     start                       end  net_m     location     kind
+TRIP_014 2026-06-17 06:40:00+05:30     11    V-06  P-0003342 P-0003372 2026-06-17 06:46:00+05:30 2026-06-17 06:56:01+05:30   10.2 Borivali Stn terminus
+TRIP_014 2026-06-17 06:50:00+05:30     11    V-06  P-0003354 P-0003384 2026-06-17 06:50:00+05:30 2026-06-17 07:00:03+05:30   16.0 Borivali Stn terminus
+TRIP_014 2026-06-17 07:00:00+05:30     11    V-06  P-0003384 P-0003415 2026-06-17 07:00:03+05:30 2026-06-17 07:10:10+05:30   27.3 Borivali Stn terminus
+TRIP_014 2026-06-17 07:10:00+05:30     11    V-06  P-0003415 P-0003445 2026-06-17 07:10:10+05:30 2026-06-17 07:20:13+05:30   13.3 Borivali Stn terminus
+TRIP_014 2026-06-17 07:20:00+05:30     11    V-06  P-0003445 P-0003474 2026-06-17 07:20:13+05:30 2026-06-17 07:30:15+05:30   19.8 Borivali Stn terminus
+TRIP_014 2026-06-17 07:30:00+05:30     11    V-06  P-0003474 P-0003504 2026-06-17 07:30:15+05:30 2026-06-17 07:40:20+05:30   11.8 Borivali Stn terminus
+
+3. Route 11 first >5 km/h origin ping
+    trip       date  route vehicle            schedule_start first_gt5_ping       departure_ping_time  minutes_from_start
+TRIP_002 2026-06-15     11    V-06 2026-06-15 06:40:00+05:30      P-0000241 2026-06-15 06:40:17+05:30                 0.3
+TRIP_008 2026-06-16     11    V-06 2026-06-16 06:41:00+05:30      P-0001794 2026-06-16 06:41:17+05:30                 0.3
+TRIP_014 2026-06-17     11    V-06 2026-06-17 06:46:00+05:30            NaN                       NaT                 NaN
+Historical first->moving origin offset: n=10, median=0.3 min, p95=0.4, min=0.3, max=0.4.
+V-06 near Borivali 17 Jun: 192 pings; speed median=0.9, p95=2.0, max=2.7. All trip pings near any stop: n=551, median=7.1, p95=20.7, max=30.0.
+END descriptive only.

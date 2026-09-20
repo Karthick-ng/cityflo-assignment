@@ -1,0 +1,43 @@
+ASSUMPTIONS
+1. Only received_at <= as-of pings are eligible; malformed recorded_at is ignored.
+2. Deduplicate (vehicle_id, recorded_at), then drop implied coordinate speeds >130 km/h.
+3. A is position-based uniform scheduled progress along the stop polyline.
+4. If historical received gaps are <=3m gate=3m; otherwise gate=max historical gap+1s.
+5. A trip with no received ping is HOLD during the first freshness-gate interval after scheduled start, then NO_VERDICT.
+6. CALL_DRIVER needs >=2 received pings spanning >=9m of last 10m and net displacement <100m.
+7. Destination means within 100m of final listed stop.
+8. Route tier uses CALL_DRIVER > NO_VERDICT > PUSH_LATE > HOLD; ties rank bookings then silence.
+9. Rev. C view below is display-only; real table applies neither rule.
+Historical healthy in-trip maximum received gap: 38.0s (0.63m). Freshness gate used: 3.00m.
+
+REAL VIEW: one row per route
+ route              route_name     verdict  bookings  longest_silence_min                                                  reason_all_trips
+     9           Thane → Powai        HOLD        12             0.266667                                   TRIP_013:HOLD A=0.7m; P-0003264
+    11          Borivali → BKC CALL_DRIVER         8             0.100000                       TRIP_014:CALL_DRIVER net 15m/10m; P-0003518
+    12      Mulund → Andheri E   PUSH_LATE         9             0.116667                             TRIP_015:PUSH_LATE A=10.2m; P-0003624
+    14 Kandivali → Lower Parel  NO_VERDICT        12            48.050000                       TRIP_016:NO_VERDICT stale 48.0m (P-0003828)
+    17           Vashi → Worli  NO_VERDICT        16            17.300000                       TRIP_017:NO_VERDICT stale 17.3m (P-0004087)
+    21         Ghatkopar → BKC        HOLD        12             0.133333 TRIP_018:HOLD A=-0.1m; P-0004162; TRIP_019:HOLD A=1.1m; P-0004323
+
+REV. C VIEW ONLY: operator 7 omitted; Route 12 forced HOLD
+ route     verdict  bookings  longest_silence_min                            reason_all_trips
+     9        HOLD        12             0.266667             TRIP_013:HOLD A=0.7m; P-0003264
+    11 CALL_DRIVER         8             0.100000 TRIP_014:CALL_DRIVER net 15m/10m; P-0003518
+    12        HOLD         9             0.116667          rev. C forced on-time / 0 lateness
+    14  NO_VERDICT        12            48.050000 TRIP_016:NO_VERDICT stale 48.0m (P-0003828)
+    17  NO_VERDICT        16            17.300000 TRIP_017:NO_VERDICT stale 17.3m (P-0004087)
+    21        HOLD         6             0.133333            TRIP_018:HOLD A=-0.1m; P-0004162
+
+WORRY ORDER
+ route              route_name     verdict  bookings  longest_silence_min
+    11          Borivali → BKC CALL_DRIVER         8             0.100000
+    17           Vashi → Worli  NO_VERDICT        16            17.300000
+    14 Kandivali → Lower Parel  NO_VERDICT        12            48.050000
+    12      Mulund → Andheri E   PUSH_LATE         9             0.116667
+     9           Thane → Powai        HOLD        12             0.266667
+    21         Ghatkopar → BKC        HOLD        12             0.133333
+POLICY EDGE CASES FROM CODE: a trip past scheduled end but not within 100m of destination is not automatically HOLD. If stale it is NO_VERDICT; if fresh and immobile for the qualifying 10-minute window it is CALL_DRIVER; otherwise A is computed and it is PUSH_LATE when A >=5, else HOLD. A fresh moving trip with A >=5 does not meet the net-displacement CALL_DRIVER condition and produces PUSH_LATE. The current 17-Jun example of fresh, moving, A>=5 is TRIP_015 (PUSH_LATE); no current row is past scheduled end and fresh while outside the 100m destination radius.
+Historical 5-minute evaluations: 0 non-HOLD trip verdicts.
+
+Non-HOLD historical events
+  None

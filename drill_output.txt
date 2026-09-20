@@ -1,0 +1,168 @@
+ASSUMPTIONS
+1. All timestamps are parsed as offset-bearing IST timestamps.
+2. Trip ping membership means same vehicle and recorded_at within exact scheduled start/end.
+3. 'Near origin/destination/stop' means within 100m of that stop; 'moving' means speed_kmph > 1.
+4. Route progress is projection onto the ordered stop polyline using a local planar approximation; it is descriptive, not road-matched.
+5. Timetable progress fraction is elapsed scheduled time / scheduled runtime. It is not a lateness calculation.
+6. A lag episode is defined here as lag >=300 seconds; a '90-minute' episode is exactly 5400 seconds.
+7. 'Last ping before silence' means the final recorded_at ping before 07:45; no cause is inferred from absence of later pings.
+8. Completed-trip runtime requires both a moving ping within 100m of origin and a ping within 100m of destination; otherwise it is reported unavailable.
+9. No operator, route, ping, or booking is excluded or corrected; no reconciliation rule is applied.
+
+A. V-04 90-MINUTE LAG
+17 Jun: TRIP_016, Route 14, scheduled 2026-06-17 06:40:00+05:30 to 2026-06-17 07:55:00+05:30.
+
+Last normal / first 5400s-lag ping
+  ping_id               recorded_at               received_at  lag_s       lat       lon  speed_kmph
+P-0003828 2026-06-17 06:56:54+05:30 2026-06-17 06:56:57+05:30    3.0 19.159702 72.846601        13.3
+P-0003829 2026-06-17 06:57:13+05:30 2026-06-17 08:27:13+05:30 5400.0 19.158736 72.846482        21.3
+5400s episode: 145 pings; starts 2026-06-17 06:57:13+05:30, ends 2026-06-17 07:44:46+05:30; received range 2026-06-17 08:27:13+05:30 to 2026-06-17 09:14:46+05:30.
+After episode: 0 later device-time rows; of these, 0 have normal lag.
+
+Boundary sequence (device order)
+  ping_id               recorded_at               received_at  lag_s  speed_kmph
+P-0003822 2026-06-17 06:54:57+05:30 2026-06-17 06:55:00+05:30    3.0        15.4
+P-0003823 2026-06-17 06:55:15+05:30 2026-06-17 06:55:16+05:30    1.0        15.5
+P-0003824 2026-06-17 06:55:34+05:30 2026-06-17 06:55:36+05:30    2.0        19.2
+P-0003825 2026-06-17 06:55:55+05:30 2026-06-17 06:55:56+05:30    1.0        15.9
+P-0003826 2026-06-17 06:56:13+05:30 2026-06-17 06:56:16+05:30    3.0        16.5
+P-0003827 2026-06-17 06:56:36+05:30 2026-06-17 06:56:38+05:30    2.0        21.2
+P-0003828 2026-06-17 06:56:54+05:30 2026-06-17 06:56:57+05:30    3.0        13.3
+P-0003829 2026-06-17 06:57:13+05:30 2026-06-17 08:27:13+05:30 5400.0        21.3
+P-0003830 2026-06-17 06:57:35+05:30 2026-06-17 08:27:35+05:30 5400.0        15.0
+P-0003831 2026-06-17 06:57:52+05:30 2026-06-17 08:27:52+05:30 5400.0        13.5
+P-0003832 2026-06-17 06:58:12+05:30 2026-06-17 08:28:12+05:30 5400.0        20.5
+P-0003833 2026-06-17 06:58:30+05:30 2026-06-17 08:28:30+05:30 5400.0        16.2
+P-0003834 2026-06-17 06:58:52+05:30 2026-06-17 08:28:52+05:30 5400.0        19.4
+The received timestamps for 5400s rows remain recorded_at + 90 minutes, so they are spread at their normal device cadence in received time, not one identical-timestamp burst.
+
+All >=300s lag episodes (includes 15/16 June if any)
+vehicle_id       date  pings_lag_ge_300s  min_lag_s  max_lag_s first_ping last_ping
+      V-04 2026-06-17                145     5400.0     5400.0  P-0003829 P-0003973
+
+Sample of V-04's lagged pings in recorded-time order
+  ping_id               recorded_at               received_at  speed_kmph  along_m  along_pct nearest_stop  polyline_offset_m
+P-0003829 2026-06-17 06:57:13+05:30 2026-06-17 08:27:13+05:30        21.3   5158.3       22.8      Malad E                2.3
+P-0003853 2026-06-17 07:05:07+05:30 2026-06-17 08:35:07+05:30        17.2   7513.7       33.2     Goregaon               11.9
+P-0003877 2026-06-17 07:13:08+05:30 2026-06-17 08:43:08+05:30        23.4   9909.7       43.8   Jogeshwari               12.0
+P-0003901 2026-06-17 07:20:58+05:30 2026-06-17 08:50:58+05:30        25.3  12260.1       54.1    Andheri W                0.5
+P-0003925 2026-06-17 07:29:00+05:30 2026-06-17 08:59:00+05:30        20.8  14645.8       64.7       Bandra                2.0
+P-0003949 2026-06-17 07:36:46+05:30 2026-06-17 09:06:46+05:30        15.9  16971.1       74.9        Mahim                3.8
+P-0003973 2026-06-17 07:44:46+05:30 2026-06-17 09:14:46+05:30        20.0  19373.4       85.6  Worli Dairy               10.2
+
+B. V-05 / ROUTE 17
+TRIP_017, Route 17, scheduled 2026-06-17 06:50:00+05:30 to 2026-06-17 07:55:00+05:30.
+
+Last recorded ping at/before 07:45
+  ping_id               recorded_at               received_at  speed_kmph      along_m  along_pct nearest_stop nearest_stop_id  nearest_stop_m  polyline_offset_m
+P-0004087 2026-06-17 07:27:40+05:30 2026-06-17 07:27:42+05:30         5.0 14585.818138  70.621587     Dadar TT          S-1706        5.165583           2.875961
+Classification under assumptions: moving; nearest stop Dadar TT (5.2m), route progress 70.6%.
+
+V-05 in-trip gaps >3 minutes
+  None
+
+V-05 gaps >3 min on 15/16 June
+  ping_id               recorded_at   gap_s
+P-0002633 2026-06-16 06:45:00+05:30 80408.0
+
+C. V-11 SPEED-GLITCH SEQUENCE
+P-0003148: 2026-06-17 07:06:02+05:30, V-11, speed 6550.6; trip/route TRIP_013/9.
+P-0003149: 2026-06-17 07:06:25+05:30, V-11, speed 7812.8; trip/route TRIP_013/9.
+P-0003150: 2026-06-17 07:06:45+05:30, V-11, speed 6500.2; trip/route TRIP_013/9.
+P-0003151: 2026-06-17 07:07:04+05:30, V-11, speed 11.7; trip/route TRIP_013/9.
+
+Two minutes either side of glitch sequence
+  ping_id               recorded_at               received_at       lat       lon  speed_kmph
+P-0003143 2026-06-17 07:04:17+05:30 2026-06-17 07:04:18+05:30 19.192047 72.960298        12.1
+P-0003144 2026-06-17 07:04:37+05:30 2026-06-17 07:04:39+05:30 19.191351 72.959955        15.0
+P-0003145 2026-06-17 07:04:59+05:30 2026-06-17 07:05:00+05:30 19.190764 72.959542        12.7
+P-0003146 2026-06-17 07:05:20+05:30 2026-06-17 07:05:24+05:30 19.190152 72.958880        18.9
+P-0003147 2026-06-17 07:05:42+05:30 2026-06-17 07:05:44+05:30 19.189444 72.958493        16.8
+P-0003148 2026-06-17 07:06:02+05:30 2026-06-17 07:06:06+05:30 19.688900 73.508093      6550.6
+P-0003149 2026-06-17 07:06:25+05:30 2026-06-17 07:06:29+05:30 19.538136 72.577610      7812.8
+P-0003150 2026-06-17 07:06:45+05:30 2026-06-17 07:06:47+05:30 19.687546 72.577130      6500.2
+P-0003151 2026-06-17 07:07:04+05:30 2026-06-17 07:07:06+05:30 19.187093 72.956624        11.7
+P-0003152 2026-06-17 07:07:23+05:30 2026-06-17 07:07:25+05:30 19.186583 72.956093        14.1
+P-0003153 2026-06-17 07:07:42+05:30 2026-06-17 07:07:45+05:30 19.185988 72.955715        11.9
+P-0003154 2026-06-17 07:08:01+05:30 2026-06-17 07:08:04+05:30 19.185427 72.955269        14.2
+P-0003155 2026-06-17 07:08:20+05:30 2026-06-17 07:08:23+05:30 19.184758 72.954852        16.5
+P-0003156 2026-06-17 07:08:40+05:30 2026-06-17 07:08:42+05:30 19.184141 72.954453        13.9
+P-0003157 2026-06-17 07:09:00+05:30 2026-06-17 07:09:02+05:30 19.183564 72.953976        13.2
+
+V-11 latest received ping by 07:45
+  ping_id               recorded_at               received_at  speed_kmph
+P-0003264 2026-06-17 07:44:42+05:30 2026-06-17 07:44:44+05:30        14.8
+
+D. ROUTE 12 / TRIP_015 RAW COMPARISON
+
+First moving ping near Route 12 origin
+ trip_id       date           scheduled_start first_moving_near_origin_ping               recorded_at  minutes_from_scheduled_start
+TRIP_003 2026-06-15 2026-06-15 07:08:00+05:30                     P-0000525 2026-06-15 07:08:00+05:30                           0.0
+TRIP_009 2026-06-16 2026-06-16 07:02:00+05:30                     P-0002077 2026-06-16 07:02:20+05:30                           0.3
+TRIP_015 2026-06-17 2026-06-17 07:05:00+05:30                     P-0003534 2026-06-17 07:15:00+05:30                          10.0
+
+Route 12 observed route progress at 07:45 versus scheduled elapsed fraction
+ trip_id       date  scheduled_elapsed_pct_at_0745 last_ping_by_recorded_at  observed_polyline_pct                 ping_time
+TRIP_003 2026-06-15                           61.7                P-0000636                   58.8 2026-06-15 07:44:43+05:30
+TRIP_009 2026-06-16                           71.7                P-0002205                   69.7 2026-06-16 07:45:00+05:30
+TRIP_015 2026-06-17                           66.7                P-0003624                   49.7 2026-06-17 07:44:51+05:30
+
+E. OPERATOR 7 AND ROUTE 21
+
+All trips per day / route / operator
+service_date  route_id  trip_id vehicle_id  operator_id
+  2026-06-15         9 TRIP_001       V-11            5
+  2026-06-15        11 TRIP_002       V-06            5
+  2026-06-15        12 TRIP_003       V-10            5
+  2026-06-15        14 TRIP_004       V-04            6
+  2026-06-15        17 TRIP_005       V-05            5
+  2026-06-15        21 TRIP_006       V-03            5
+  2026-06-16         9 TRIP_007       V-11            5
+  2026-06-16        11 TRIP_008       V-06            5
+  2026-06-16        12 TRIP_009       V-10            5
+  2026-06-16        14 TRIP_010       V-04            6
+  2026-06-16        17 TRIP_011       V-05            5
+  2026-06-16        21 TRIP_012       V-03            5
+  2026-06-17         9 TRIP_013       V-11            5
+  2026-06-17        11 TRIP_014       V-06            5
+  2026-06-17        12 TRIP_015       V-10            5
+  2026-06-17        14 TRIP_016       V-04            6
+  2026-06-17        17 TRIP_017       V-05            5
+  2026-06-17        21 TRIP_018       V-03            5
+  2026-06-17        21 TRIP_019       V-09            7
+
+All routes: 17 June trip counts
+ route_id  trips   vehicles operators
+        9      1       V-11         5
+       11      1       V-06         5
+       12      1       V-10         5
+       14      1       V-04         6
+       17      1       V-05         5
+       21      2 V-03, V-09      5, 7
+
+Route 21 vehicles/operators by day
+service_date  trip_id vehicle_id  operator_id
+  2026-06-15 TRIP_006       V-03            5
+  2026-06-16 TRIP_012       V-03            5
+  2026-06-17 TRIP_018       V-03            5
+  2026-06-17 TRIP_019       V-09            7
+Dropping operator 7 would remove these trip rows: 1; route IDs represented: [21]. No route has only operator-7 trips in this extract.
+
+F. COMPLETED-TRIP RAW RUNTIMES, 15/16 JUNE
+
+Observed origin-to-destination ping spans
+ trip_id       date  route_id vehicle_id first_moving_origin_ping last_near_destination_ping  observed_minutes  scheduled_minutes
+TRIP_001 2026-06-15         9       V-11                P-0000001                        NaN               NaN               55.0
+TRIP_002 2026-06-15        11       V-06                P-0000240                  P-0000449              69.7               70.0
+TRIP_003 2026-06-15        12       V-10                P-0000525                        NaN               NaN               60.0
+TRIP_004 2026-06-15        14       V-04                      NaN                  P-0001009               NaN               75.0
+TRIP_005 2026-06-15        17       V-05                P-0001086                  P-0001282              64.9               65.0
+TRIP_006 2026-06-15        21       V-03                P-0001359                        NaN               NaN               40.0
+TRIP_007 2026-06-16         9       V-11                P-0001553                        NaN               NaN               55.0
+TRIP_008 2026-06-16        11       V-06                P-0001793                  P-0002001              69.9               70.0
+TRIP_009 2026-06-16        12       V-10                P-0002077                        NaN               NaN               60.0
+TRIP_010 2026-06-16        14       V-04                P-0002331                  P-0002556              74.8               75.0
+TRIP_011 2026-06-16        17       V-05                P-0002634                        NaN               NaN               65.0
+TRIP_012 2026-06-16        21       V-03                P-0002905                  P-0003025              39.8               40.0
+
+END: descriptive drill-down only; no lateness value, verdict, or reconciliation rule applied.
